@@ -1,23 +1,8 @@
-import {
-  ArchiveRestore,
-  CalendarDays,
-  Check,
-  Code2,
-  Database,
-  Download,
-  ExternalLink,
-  FileKey2,
-  Fingerprint,
-  HardDrive,
-  RefreshCcw,
-  ShieldCheck,
-  Trash2,
-  Upload,
-} from 'lucide-react'
+import { ArchiveRestore, CalendarDays, Check, Code as Code2, Database, Download, ExternalLink, FileKey as FileKey2, FingerprintPattern as Fingerprint, HardDrive, RefreshCcw, ShieldCheck, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { clearAllData, resetDemoData } from '../lib/db'
 import { sourceUrl } from '../lib/config'
-import { exportBackup, exportCalendar, restoreBackup } from '../lib/export'
+import { BackupError, exportBackup, exportCalendar, restoreBackup } from '../lib/export'
 import { formatBytes } from '../lib/utils'
 import type { CaseSnapshot } from '../types'
 
@@ -60,7 +45,9 @@ export function DataView({ snapshots, onToast }: DataViewProps) {
       onToast('Backup restored on this device.')
     } catch (error) {
       console.error(error)
-      onToast(error instanceof Error ? error.message : 'The backup could not be restored.')
+      onToast(
+        error instanceof BackupError ? error.message : 'The backup could not be restored.',
+      )
     } finally {
       if (inputRef.current) inputRef.current.value = ''
     }

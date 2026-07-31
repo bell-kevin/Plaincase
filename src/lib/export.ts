@@ -373,6 +373,13 @@ export async function exportBackup(): Promise<void> {
   )
 }
 
+export class BackupError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'BackupError'
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -385,7 +392,7 @@ function requireString(
 ): string {
   const value = record[key]
   if (typeof value !== 'string' || value.length > maxLength) {
-    throw new Error(`Invalid backup: ${context}.${key} must be a string.`)
+    throw new BackupError(`Invalid backup: ${context}.${key} must be a string.`)
   }
   return value
 }
@@ -399,7 +406,7 @@ function optionalString(
   const value = record[key]
   if (value === undefined) return undefined
   if (typeof value !== 'string' || value.length > maxLength) {
-    throw new Error(`Invalid backup: ${context}.${key} must be a string when present.`)
+    throw new BackupError(`Invalid backup: ${context}.${key} must be a string when present.`)
   }
   return value
 }
@@ -435,7 +442,7 @@ function requireDate(
     (shape !== 'timestamp' && isCalendarDate(value)) ||
     (shape !== 'date' && isCanonicalTimestamp(value))
   if (!valid) {
-    throw new Error(
+    throw new BackupError(
       `Invalid backup: ${context} must be a real ${
         shape === 'date'
           ? 'YYYY-MM-DD calendar date'
@@ -450,10 +457,10 @@ function requireDate(
 function validateIds(items: unknown[], context: string): Set<string> {
   const ids = new Set<string>()
   items.forEach((item, index) => {
-    if (!isRecord(item)) throw new Error(`Invalid backup: ${context}[${index}] is not an object.`)
+    if (!isRecord(item)) throw new BackupError(`Invalid backup: ${context}[${index}] is not an object.`)
     const id = requireString(item, 'id', `${context}[${index}]`, 200)
     if (!/^[A-Za-z0-9_.-]+$/.test(id) || ids.has(id)) {
-      throw new Error(
+      throw new BackupError(
         `Invalid backup: ${context} contains an unsafe, empty, or duplicate ID.`,
       )
     }
@@ -463,9 +470,9 @@ function validateIds(items: unknown[], context: string): Set<string> {
 }
 
 function assertBackup(value: unknown): asserts value is BackupEnvelope {
-  if (!isRecord(value)) throw new Error('That file is not a Plaincase backup.')
+  if (!isRecord(value)) throw new BackupError('That file is not a Plaincase backup.')
   if (value.format !== 'plaincase-backup' || value.version !== 1) {
-    throw new Error('This backup format is not supported.')
+    throw new BackupError('This backup format is not supported.')
   }
 
   const limits = {
@@ -478,7 +485,7 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
   for (const [key, limit] of Object.entries(limits)) {
     const collection = value[key]
     if (!Array.isArray(collection) || collection.length > limit) {
-      throw new Error(`Invalid backup: ${key} must be an array with at most ${limit} entries.`)
+      throw new BackupError(`Invalid backup: ${key} must be an array with at most ${limit} entries.`)
     }
   }
 
@@ -521,18 +528,18 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
     const status = requireString(item, 'status', context, 20)
     const stage = requireString(item, 'stage', context, 20)
     if (!statuses.has(status) || !stages.has(stage)) {
-      throw new Error(`Invalid backup: ${context} has an unknown status or stage.`)
+      throw new BackupError(`Invalid backup: ${context} has an unknown status or stage.`)
     }
     const amount = item.amount
     if (
       amount !== undefined &&
       (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0)
     ) {
-      throw new Error(`Invalid backup: ${context}.amount must be a non-negative number.`)
+      throw new BackupError(`Invalid backup: ${context}.amount must be a non-negative number.`)
     }
     const accent = requireString(item, 'accent', context, 20)
     if (!/^#[0-9a-f]{6}$/i.test(accent)) {
-      throw new Error(`Invalid backup: ${context}.accent is not a six-digit hex color.`)
+      throw new BackupError(`Invalid backup: ${context}.accent is not a six-digit hex color.`)
     }
     const targetDate = optionalString(item, 'targetDate', context, 40)
     const createdAt = requireString(item, 'createdAt', context, 40)
@@ -555,9 +562,9 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
     if (!isRecord(item)) return
     const context = `events[${index}]`
     const caseId = requireString(item, 'caseId', context, 200)
-    if (!caseIds.has(caseId)) throw new Error(`Invalid backup: ${context} refers to no case.`)
+    if (!caseIds.has(caseId)) throw new BackupError(`Invalid backup: ${context} refers to no case.`)
     const kind = requireString(item, 'kind', context, 20)
-    if (!eventKinds.has(kind)) throw new Error(`Invalid backup: ${context} has an unknown kind.`)
+    if (!eventKinds.has(kind)) throw new BackupError(`Invalid backup: ${context} has an unknown kind.`)
     requireString(item, 'title', context, 500)
     requireString(item, 'detail', context)
     requireString(item, 'actor', context, 500)
@@ -565,10 +572,10 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
     const commitmentId = optionalString(item, 'commitmentId', context, 200)
     if (commitmentId) {
       if (!commitmentIds.has(commitmentId)) {
-        throw new Error(`Invalid backup: ${context} refers to no commitment.`)
+        throw new BackupError(`Invalid backup: ${context} refers to no commitment.`)
       }
       if (caseByCommitment.get(commitmentId) !== caseId) {
-        throw new Error(`Invalid backup: ${context} links to a commitment in another case.`)
+        throw new BackupError(`Invalid backup: ${context} links to a commitment in another case.`)
       }
     }
     const occurredAt = requireString(item, 'occurredAt', context, 40)
@@ -581,7 +588,7 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
     if (!isRecord(item)) return
     const context = `evidence[${index}]`
     const caseId = requireString(item, 'caseId', context, 200)
-    if (!caseIds.has(caseId)) throw new Error(`Invalid backup: ${context} refers to no case.`)
+    if (!caseIds.has(caseId)) throw new BackupError(`Invalid backup: ${context} refers to no case.`)
     requireString(item, 'name', context, 500)
     requireString(item, 'mimeType', context, 300)
     requireString(item, 'category', context, 100)
@@ -593,15 +600,15 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
       size < 0 ||
       size > 50 * 1024 * 1024
     ) {
-      throw new Error(`Invalid backup: ${context}.size is outside the 50 MB file limit.`)
+      throw new BackupError(`Invalid backup: ${context}.size is outside the 50 MB file limit.`)
     }
     const hash = requireString(item, 'hash', context, 64)
     if (!/^[0-9a-f]{64}$/i.test(hash)) {
-      throw new Error(`Invalid backup: ${context}.hash is not SHA-256.`)
+      throw new BackupError(`Invalid backup: ${context}.hash is not SHA-256.`)
     }
     const dataUrl = requireString(item, 'dataUrl', context, 70 * 1024 * 1024)
     if (!/^data:[^,;\r\n]*;base64,[A-Za-z0-9+/]*={0,2}$/.test(dataUrl)) {
-      throw new Error(`Invalid backup: ${context}.dataUrl is not base64 file data.`)
+      throw new BackupError(`Invalid backup: ${context}.dataUrl is not base64 file data.`)
     }
     const addedAt = requireString(item, 'addedAt', context, 40)
     const occurredAt = optionalString(item, 'occurredAt', context, 40)
@@ -614,7 +621,7 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
     if (!isRecord(item)) return
     const context = `commitments[${index}]`
     const caseId = requireString(item, 'caseId', context, 200)
-    if (!caseIds.has(caseId)) throw new Error(`Invalid backup: ${context} refers to no case.`)
+    if (!caseIds.has(caseId)) throw new BackupError(`Invalid backup: ${context} refers to no case.`)
     requireString(item, 'maker', context, 500)
     requireString(item, 'detail', context)
     optionalString(item, 'sourceExcerpt', context)
@@ -622,30 +629,30 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
     const sourceEvidenceId = optionalString(item, 'sourceEvidenceId', context, 200)
     if (sourceEventId) {
       if (!caseByEvent.has(sourceEventId)) {
-        throw new Error(`Invalid backup: ${context} refers to no source event.`)
+        throw new BackupError(`Invalid backup: ${context} refers to no source event.`)
       }
       if (caseByEvent.get(sourceEventId) !== caseId) {
-        throw new Error(`Invalid backup: ${context} links to a source event in another case.`)
+        throw new BackupError(`Invalid backup: ${context} links to a source event in another case.`)
       }
     }
     if (sourceEvidenceId) {
       if (!caseByEvidence.has(sourceEvidenceId)) {
-        throw new Error(`Invalid backup: ${context} refers to no source file.`)
+        throw new BackupError(`Invalid backup: ${context} refers to no source file.`)
       }
       if (caseByEvidence.get(sourceEvidenceId) !== caseId) {
-        throw new Error(`Invalid backup: ${context} links to a source file in another case.`)
+        throw new BackupError(`Invalid backup: ${context} links to a source file in another case.`)
       }
     }
     const removedSource = item.sourceEvidenceRemoved
     if (removedSource !== undefined) {
       if (!isRecord(removedSource) || sourceEvidenceId) {
-        throw new Error(
+        throw new BackupError(
           `Invalid backup: ${context}.sourceEvidenceRemoved is malformed or conflicts with a live source.`,
         )
       }
       const removedId = requireString(removedSource, 'id', `${context}.sourceEvidenceRemoved`, 200)
       if (!/^[A-Za-z0-9_.-]+$/.test(removedId)) {
-        throw new Error(`Invalid backup: ${context}.sourceEvidenceRemoved has an unsafe ID.`)
+        throw new BackupError(`Invalid backup: ${context}.sourceEvidenceRemoved has an unsafe ID.`)
       }
       requireString(removedSource, 'name', `${context}.sourceEvidenceRemoved`, 500)
       const removedHash = requireString(
@@ -655,7 +662,7 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
         64,
       )
       if (!/^[0-9a-f]{64}$/i.test(removedHash)) {
-        throw new Error(
+        throw new BackupError(
           `Invalid backup: ${context}.sourceEvidenceRemoved.hash is not SHA-256.`,
         )
       }
@@ -669,7 +676,7 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
     }
     const status = requireString(item, 'status', context, 20)
     if (!commitmentStatuses.has(status)) {
-      throw new Error(`Invalid backup: ${context} has an unknown status.`)
+      throw new BackupError(`Invalid backup: ${context} has an unknown status.`)
     }
     const dueAt = requireString(item, 'dueAt', context, 40)
     const createdAt = requireString(item, 'createdAt', context, 40)
@@ -678,16 +685,16 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
     const history = item.history
     if (history !== undefined) {
       if (!Array.isArray(history) || history.length > 1_000) {
-        throw new Error(`Invalid backup: ${context}.history is too large or malformed.`)
+        throw new BackupError(`Invalid backup: ${context}.history is too large or malformed.`)
       }
       const historyIds = new Set<string>()
       history.forEach((entry, historyIndex) => {
         if (!isRecord(entry)) {
-          throw new Error(`Invalid backup: ${context}.history[${historyIndex}] is malformed.`)
+          throw new BackupError(`Invalid backup: ${context}.history[${historyIndex}] is malformed.`)
         }
         const historyId = requireString(entry, 'id', `${context}.history[${historyIndex}]`, 200)
         if (!/^[A-Za-z0-9_.-]+$/.test(historyId) || historyIds.has(historyId)) {
-          throw new Error(`Invalid backup: ${context}.history contains an unsafe or duplicate ID.`)
+          throw new BackupError(`Invalid backup: ${context}.history contains an unsafe or duplicate ID.`)
         }
         historyIds.add(historyId)
         const historyStatus = requireString(
@@ -697,7 +704,7 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
           20,
         )
         if (!commitmentStatuses.has(historyStatus)) {
-          throw new Error(`Invalid backup: ${context}.history has an unknown status.`)
+          throw new BackupError(`Invalid backup: ${context}.history has an unknown status.`)
         }
         const at = requireString(entry, 'at', `${context}.history[${historyIndex}]`, 40)
         optionalString(entry, 'note', `${context}.history[${historyIndex}]`)
@@ -710,11 +717,11 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
     if (!isRecord(item)) return
     const context = `tasks[${index}]`
     const caseId = requireString(item, 'caseId', context, 200)
-    if (!caseIds.has(caseId)) throw new Error(`Invalid backup: ${context} refers to no case.`)
+    if (!caseIds.has(caseId)) throw new BackupError(`Invalid backup: ${context} refers to no case.`)
     requireString(item, 'title', context, 500)
     const status = requireString(item, 'status', context, 20)
     if (status !== 'open' && status !== 'done') {
-      throw new Error(`Invalid backup: ${context} has an unknown status.`)
+      throw new BackupError(`Invalid backup: ${context} has an unknown status.`)
     }
     const dueAt = optionalString(item, 'dueAt', context, 40)
     const completedAt = optionalString(item, 'completedAt', context, 40)
@@ -727,22 +734,32 @@ function assertBackup(value: unknown): asserts value is BackupEnvelope {
 
 export async function restoreBackup(file: File): Promise<void> {
   if (file.size > 250 * 1024 * 1024) {
-    throw new Error('This backup is larger than the 250 MB browser restore limit.')
+    throw new BackupError('This backup is larger than the 250 MB browser restore limit.')
   }
-  const raw: unknown = JSON.parse(await file.text())
+  let raw: unknown
+  try {
+    raw = JSON.parse(await file.text()) as unknown
+  } catch {
+    throw new BackupError('That file could not be read as a Plaincase backup.')
+  }
   assertBackup(raw)
   const evidence: EvidenceItem[] = []
   for (const { dataUrl, ...item } of raw.evidence) {
-    const blob = dataUrlToBlob(dataUrl)
+    let blob: Blob
+    try {
+      blob = dataUrlToBlob(dataUrl)
+    } catch {
+      throw new BackupError(`The stored file data for “${item.name}” is not readable.`)
+    }
     if (blob.size !== item.size) {
-      throw new Error(`Size check failed for “${item.name}”. The backup was not restored.`)
+      throw new BackupError(`Size check failed for “${item.name}”. The backup was not restored.`)
     }
     if (blob.type.toLowerCase() !== item.mimeType.toLowerCase()) {
-      throw new Error(`File type check failed for “${item.name}”. The backup was not restored.`)
+      throw new BackupError(`File type check failed for “${item.name}”. The backup was not restored.`)
     }
     const actualHash = await hashBlob(blob)
     if (item.hash && actualHash !== item.hash) {
-      throw new Error(`Integrity check failed for “${item.name}”. The backup was not restored.`)
+      throw new BackupError(`Integrity check failed for “${item.name}”. The backup was not restored.`)
     }
     evidence.push({ ...item, hash: actualHash, blob })
   }

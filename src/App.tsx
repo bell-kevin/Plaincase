@@ -40,11 +40,7 @@ export default function App() {
       .then(() => setReady(true))
       .catch((error) => {
         console.error(error)
-        setInitError(
-          error instanceof Error
-            ? error.message
-            : 'Plaincase could not open its local database in this browser.',
-        )
+        setInitError('Plaincase could not open its local database in this browser.')
       })
   }, [])
 
