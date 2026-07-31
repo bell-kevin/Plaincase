@@ -4,7 +4,7 @@
 
 **A private, local-first workspace for turning everyday disputes into a clear paper trail.**
 
-https://recordtrail.org
+https://documenttrail.org
 
 Plaincase helps a person organize a repair that keeps stalling, a damaged purchase, an
 insurance claim, contractor work, a medical bill, or another unresolved matter. It keeps
