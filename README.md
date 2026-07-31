@@ -1,3 +1,5 @@
+<a name="readme-top"></a>
+
 # Plaincase
 
 **A private, local-first workspace for turning everyday disputes into a clear paper trail.**
@@ -388,3 +390,5 @@ in the private channel described in [SECURITY.md](SECURITY.md), not a public iss
 Plaincase is free software licensed under the
 [GNU Affero General Public License, version 3 or (at your option) any later version](LICENSE).
 Contributions are accepted under the same license.
+
+<p align="right"><a href="#readme-top">back to top</a></p>
